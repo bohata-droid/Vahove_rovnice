@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+  <meta charset="UTF-8">
+  <title>Váhová rovnice</title>
+  <style>
+    body { font-family: 'Segoe UI', Arial, sans-serif; }
+    canvas { border: 1px solid #ccc; margin-top: 10px; }
+    input { width: 320px; font-size: 16px; padding: 4px; }
+    button { font-size: 16px; padding: 4px 10px; margin: 6px 4px; }
+  </style>
+</head>
+<body>
+
+  <h2>Zadej rovnici (např. 3x + 5 = x + 9)</h2>
+  <input id="equationInput" type="text" placeholder="Např. 3x + 5 = x + 9">
+  <button onclick="drawEquation()">Vykresli</button>
+  <button onclick="copyImage()">Kopírovat obrázek</button>
+
+  <br>
+  <canvas id="scaleCanvas" width="300" height="200"></canvas>
+
+  <script>
+    function parseSide(side) {
+      const xMatch = side.match(/([+-]?\d*)x/);
+      const xCount = xMatch ? parseInt(xMatch[1] || '1', 10) : 0;
+      const numMatch = side.match(/([+-]?\d+)(?!x)/g);
+      const numSum = numMatch ? numMatch.map(Number).reduce((a, b) => a + b, 0) : 0;
+      return { xCount, numSum };
+    }
+
+    function drawEquation() {
+      const eqRaw = document.getElementById('equationInput').value;
+      const eq = eqRaw.replace(/\s+/g, '');
+      const parts = eq.split('=');
+      if (parts.length !== 2) return;
+
+      const [left, right] = parts;
+      const leftSide = parseSide(left);
+      const rightSide = parseSide(right);
+
+      const canvas = document.getElementById('scaleCanvas');
+      const ctx = canvas.getContext('2d');
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      const radius = 42;
+      const gap = radius * 3;
+
+      const centerX = canvas.width / 2;
+      const leftX = centerX - gap / 2;
+      const rightX = centerX + gap / 2;
+
+      const armY = 140;
+      const standX = centerX;
+
+      // STOJAN
+      ctx.fillStyle = '#444';
+      ctx.fillRect(standX - 4, armY, 8, 30);
+
+      // RAMENO
+      ctx.beginPath();
+      ctx.moveTo(leftX, armY);
+      ctx.lineTo(rightX, armY);
+      ctx.strokeStyle = '#000';
+      ctx.lineWidth = 4;
+      ctx.stroke();
+
+      // MISKY
+      drawPan(ctx, leftX, armY, leftSide.xCount, leftSide.numSum);
+      drawPan(ctx, rightX, armY, rightSide.xCount, rightSide.numSum);
+    }
+
+    function drawPan(ctx, x, armY, xCount, numSum) {
+      const radius = 42;
+      const ballRadius = 10;
+      const ballDiameter = ballRadius * 2;
+
+      const panCenterY = armY - radius;
+
+      ctx.beginPath();
+      ctx.arc(x, panCenterY, radius, 0, Math.PI, false);
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = '#000';
+      ctx.stroke();
+
+      const rimY = panCenterY - radius;
+      const offset = radius;
+
+      let bottomRowCount = Math.min(3, xCount);
+      let topRowCount = xCount > 3 ? xCount - 3 : 0;
+
+      const bottomRowY = rimY + offset + ballDiameter;
+      const topRowY = topRowCount > 0 ? rimY + offset : null;
+
+      if (bottomRowCount > 0) {
+        drawBallRow(ctx, x, bottomRowY, bottomRowCount, ballRadius);
+      }
+
+      if (topRowCount > 0) {
+        drawBallRow(ctx, x, topRowY, topRowCount, ballRadius);
+      }
+
+      if (numSum !== 0) {
+        const blockWidth = 50;
+        const blockHeight = 26;
+        const blockX = x - blockWidth / 2;
+
+        let highestRowY = topRowCount > 0 ? topRowY : bottomRowY;
+        const blockY = highestRowY - ballRadius - blockHeight;
+
+        ctx.fillStyle = '#fff';
+        ctx.strokeStyle = '#000';
+        ctx.lineWidth = 2;
+        ctx.fillRect(blockX, blockY, blockWidth, blockHeight);
+        ctx.strokeRect(blockX, blockY, blockWidth, blockHeight);
+
+        ctx.fillStyle = '#000';
+        ctx.font = 'bold 16px Segoe UI';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(numSum.toString(), x, blockY + blockHeight / 2);
+      }
+    }
+
+    function drawBallRow(ctx, centerX, y, count, ballRadius) {
+      const step = ballRadius * 2;
+      const totalWidth = (count - 1) * step;
+      let startX = centerX - totalWidth / 2;
+
+      for (let i = 0; i < count; i++) {
+        ctx.beginPath();
+        ctx.fillStyle = '#888';
+        ctx.strokeStyle = '#000';
+        ctx.lineWidth = 2;
+        ctx.arc(startX + i * step, y, ballRadius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+      }
+    }
+
+    async function copyImage() {
+      const canvas = document.getElementById('scaleCanvas');
+      canvas.toBlob(async (blob) => {
+        const item = new ClipboardItem({ "image/png": blob });
+        await navigator.clipboard.write([item]);
+      });
+    }
+
+    // ENTER = vykreslit rovnici
+    document.getElementById('equationInput').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        drawEquation();
+      }
+    });
+
+    window.onload = () => {
+      document.getElementById('equationInput').value = '3x + 5 = x + 9';
+      drawEquation();
+    };
+  </script>
+
+</body>
+</html>
+
