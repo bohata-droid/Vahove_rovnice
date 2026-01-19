@@ -15,9 +15,11 @@
 
   <h2>Váhové rovnice</h2>
 
-  <label>
-    <input type="checkbox" id="systemCheck" onchange="toggleSystem()"> Soustava dvou rovnic
-  </label>
+<label>
+  <input type="checkbox" id="systemCheck" onchange="toggleSystem()" style="vertical-align: middle;">
+  <span style="vertical-align: middle; margin-left: -150px;">Soustava dvou rovnic</span>
+</label>
+
 
   <div>
     <input id="eq1" type="text" placeholder="Např. 3x + 5 = x + 9">
@@ -30,7 +32,7 @@
   <button onclick="drawAll()">Vykresli</button>
   <button onclick="copyImage()">Kopírovat obrázek</button>
 
-  <canvas id="scaleCanvas" width="350" height="260"></canvas>
+  <canvas id="scaleCanvas" width="360" height="250"></canvas>
 
   <div id="solutionBox"></div>
 
