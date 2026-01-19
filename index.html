@@ -2,163 +2,290 @@
 <html lang="cs">
 <head>
   <meta charset="UTF-8">
-  <title>Váhová rovnice</title>
+  <title>Váhové rovnice – 1 nebo 2 rovnice</title>
   <style>
-    body { font-family: 'Segoe UI', Arial, sans-serif; }
-    canvas { border: 1px solid #ccc; margin-top: 10px; }
-    input { width: 320px; font-size: 16px; padding: 4px; }
+    body { font-family: 'Segoe UI', Arial, sans-serif; text-align: center; }
+    canvas { border: 1px solid #ccc; margin-top: 10px; display: block; margin-left: auto; margin-right: auto; }
+    input { width: 320px; font-size: 16px; padding: 4px; margin: 4px 0; }
     button { font-size: 16px; padding: 4px 10px; margin: 6px 4px; }
+    #solutionBox { margin-top: 15px; font-size: 18px; }
   </style>
 </head>
 <body>
 
-  <h2>Zadej rovnici (např. 3x + 5 = x + 9)</h2>
-  <input id="equationInput" type="text" placeholder="Např. 3x + 5 = x + 9">
-  <button onclick="drawEquation()">Vykresli</button>
+  <h2>Váhové rovnice</h2>
+
+  <label>
+    <input type="checkbox" id="systemCheck" onchange="toggleSystem()"> Soustava dvou rovnic
+  </label>
+
+  <div>
+    <input id="eq1" type="text" placeholder="Např. 3x + 5 = x + 9">
+  </div>
+
+  <div id="eq2box" style="display:none;">
+    <input id="eq2" type="text" placeholder="Např. y = x + 1">
+  </div>
+
+  <button onclick="drawAll()">Vykresli</button>
   <button onclick="copyImage()">Kopírovat obrázek</button>
 
-  <br>
-  <canvas id="scaleCanvas" width="300" height="200"></canvas>
+  <canvas id="scaleCanvas" width="350" height="260"></canvas>
 
-  <script>
-    function parseSide(side) {
-      const xMatch = side.match(/([+-]?\d*)x/);
-      const xCount = xMatch ? parseInt(xMatch[1] || '1', 10) : 0;
-      const numMatch = side.match(/([+-]?\d+)(?!x)/g);
-      const numSum = numMatch ? numMatch.map(Number).reduce((a, b) => a + b, 0) : 0;
-      return { xCount, numSum };
-    }
+  <div id="solutionBox"></div>
 
-    function drawEquation() {
-      const eqRaw = document.getElementById('equationInput').value;
-      const eq = eqRaw.replace(/\s+/g, '');
-      const parts = eq.split('=');
-      if (parts.length !== 2) return;
+<script>
+/* -------------------- PARSER -------------------- */
 
-      const [left, right] = parts;
-      const leftSide = parseSide(left);
-      const rightSide = parseSide(right);
+function parseSide(side) {
+  let xCount = 0, yCount = 0, numSum = 0;
 
-      const canvas = document.getElementById('scaleCanvas');
-      const ctx = canvas.getContext('2d');
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
+  const xMatches = side.match(/[+-]?\d*\.?\d*x/g);
+  if (xMatches) xMatches.forEach(m => {
+    let c = m.replace('x','');
+    if (c === '' || c === '+') c = '1';
+    if (c === '-') c = '-1';
+    xCount += parseFloat(c);
+  });
 
-      const radius = 42;
-      const gap = radius * 3;
+  const yMatches = side.match(/[+-]?\d*\.?\d*y/g);
+  if (yMatches) yMatches.forEach(m => {
+    let c = m.replace('y','');
+    if (c === '' || c === '+') c = '1';
+    if (c === '-') c = '-1';
+    yCount += parseFloat(c);
+  });
 
-      const centerX = canvas.width / 2;
-      const leftX = centerX - gap / 2;
-      const rightX = centerX + gap / 2;
+  const numMatches = side.match(/[+-]?\d+(\.\d+)?(?![xy])/g);
+  if (numMatches) numSum = numMatches.map(Number).reduce((a,b)=>a+b,0);
 
-      const armY = 140;
-      const standX = centerX;
+  return { xCount, yCount, numSum };
+}
 
-      // STOJAN
-      ctx.fillStyle = '#444';
-      ctx.fillRect(standX - 4, armY, 8, 30);
+function parseEquation(eqRaw) {
+  const eq = eqRaw.replace(/\s+/g,'');
+  const parts = eq.split('=');
+  if (parts.length !== 2) return null;
 
-      // RAMENO
-      ctx.beginPath();
-      ctx.moveTo(leftX, armY);
-      ctx.lineTo(rightX, armY);
-      ctx.strokeStyle = '#000';
-      ctx.lineWidth = 4;
-      ctx.stroke();
+  const left = parseSide(parts[0]);
+  const right = parseSide(parts[1]);
 
-      // MISKY
-      drawPan(ctx, leftX, armY, leftSide.xCount, leftSide.numSum);
-      drawPan(ctx, rightX, armY, rightSide.xCount, rightSide.numSum);
-    }
+  return {
+    a: left.xCount - right.xCount,
+    b: left.yCount - right.yCount,
+    c: right.numSum - left.numSum,
+    left, right
+  };
+}
 
-    function drawPan(ctx, x, armY, xCount, numSum) {
-      const radius = 42;
-      const ballRadius = 10;
-      const ballDiameter = ballRadius * 2;
+/* -------------------- KRESLENÍ -------------------- */
 
-      const panCenterY = armY - radius;
+function drawTriangle(ctx, cx, cy, r) {
+  ctx.beginPath();
+  ctx.moveTo(cx, cy - r);
+  ctx.lineTo(cx - r, cy + r);
+  ctx.lineTo(cx + r, cy + r);
+  ctx.closePath();
+  ctx.fillStyle = '#d88';
+  ctx.strokeStyle = '#000';
+  ctx.lineWidth = 2;
+  ctx.fill();
+  ctx.stroke();
+}
 
-      ctx.beginPath();
-      ctx.arc(x, panCenterY, radius, 0, Math.PI, false);
-      ctx.lineWidth = 3;
-      ctx.strokeStyle = '#000';
-      ctx.stroke();
+function drawBall(ctx, cx, cy, r) {
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI*2);
+  ctx.fillStyle = '#888';
+  ctx.strokeStyle = '#000';
+  ctx.lineWidth = 2;
+  ctx.fill();
+  ctx.stroke();
+}
 
-      const rimY = panCenterY - radius;
-      const offset = radius;
+function drawRow(ctx, centerX, y, count, r, drawFn) {
+  const step = r*2;
+  const totalWidth = (count - 1) * step;
+  let startX = centerX - totalWidth/2;
 
-      let bottomRowCount = Math.min(3, xCount);
-      let topRowCount = xCount > 3 ? xCount - 3 : 0;
+  for (let i=0; i<count; i++) {
+    drawFn(ctx, startX + i*step, y, r);
+  }
+}
 
-      const bottomRowY = rimY + offset + ballDiameter;
-      const topRowY = topRowCount > 0 ? rimY + offset : null;
+function drawRectPan(ctx, x, y, width, height) {
+  ctx.beginPath();
+  ctx.moveTo(x - width/2, y);
+  ctx.lineTo(x - width/2, y + height);
+  ctx.lineTo(x + width/2, y + height);
+  ctx.lineTo(x + width/2, y);
+  ctx.strokeStyle = '#000';
+  ctx.lineWidth = 3;
+  ctx.stroke();
+}
 
-      if (bottomRowCount > 0) {
-        drawBallRow(ctx, x, bottomRowY, bottomRowCount, ballRadius);
-      }
+function drawPan(ctx, x, armY, side) {
+  const r = 10;
+  const panWidth = 84;
+  const panHeight = 24;
 
-      if (topRowCount > 0) {
-        drawBallRow(ctx, x, topRowY, topRowCount, ballRadius);
-      }
+  const panTopY = armY - panHeight;
+  drawRectPan(ctx, x, panTopY, panWidth, panHeight);
 
-      if (numSum !== 0) {
-        const blockWidth = 50;
-        const blockHeight = 26;
-        const blockX = x - blockWidth / 2;
+  let currentY = armY - r;
 
-        let highestRowY = topRowCount > 0 ? topRowY : bottomRowY;
-        const blockY = highestRowY - ballRadius - blockHeight;
+  let xBottom = Math.min(3, side.xCount);
+  let xTop = side.xCount > 3 ? side.xCount - 3 : 0;
 
-        ctx.fillStyle = '#fff';
-        ctx.strokeStyle = '#000';
-        ctx.lineWidth = 2;
-        ctx.fillRect(blockX, blockY, blockWidth, blockHeight);
-        ctx.strokeRect(blockX, blockY, blockWidth, blockHeight);
+  if (xBottom > 0) {
+    drawRow(ctx, x, currentY, xBottom, r, drawBall);
+    currentY -= r*2;
+  }
 
-        ctx.fillStyle = '#000';
-        ctx.font = 'bold 16px Segoe UI';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(numSum.toString(), x, blockY + blockHeight / 2);
-      }
-    }
+  if (xTop > 0) {
+    drawRow(ctx, x, currentY, xTop, r, drawBall);
+    currentY -= r*2;
+  }
 
-    function drawBallRow(ctx, centerX, y, count, ballRadius) {
-      const step = ballRadius * 2;
-      const totalWidth = (count - 1) * step;
-      let startX = centerX - totalWidth / 2;
+  let yBottom = Math.min(3, side.yCount);
+  let yTop = side.yCount > 3 ? side.yCount - 3 : 0;
 
-      for (let i = 0; i < count; i++) {
-        ctx.beginPath();
-        ctx.fillStyle = '#888';
-        ctx.strokeStyle = '#000';
-        ctx.lineWidth = 2;
-        ctx.arc(startX + i * step, y, ballRadius, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.stroke();
-      }
-    }
+  if (yBottom > 0) {
+    drawRow(ctx, x, currentY, yBottom, r, drawTriangle);
+    currentY -= r*2;
+  }
 
-    async function copyImage() {
-      const canvas = document.getElementById('scaleCanvas');
-      canvas.toBlob(async (blob) => {
-        const item = new ClipboardItem({ "image/png": blob });
-        await navigator.clipboard.write([item]);
-      });
-    }
+  if (yTop > 0) {
+    drawRow(ctx, x, currentY, yTop, r, drawTriangle);
+    currentY -= r*2;
+  }
 
-    // ENTER = vykreslit rovnici
-    document.getElementById('equationInput').addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') {
-        drawEquation();
-      }
-    });
+  if (side.numSum !== 0) {
+    const blockW = 50, blockH = 26;
+    const blockX = x - blockW/2;
 
-    window.onload = () => {
-      document.getElementById('equationInput').value = '3x + 5 = x + 9';
-      drawEquation();
-    };
-  </script>
+    // box se dotýká řady pod ním
+    const blockY = currentY - blockH + r;
+
+    ctx.fillStyle = '#fff';
+    ctx.strokeStyle = '#000';
+    ctx.lineWidth = 2;
+    ctx.fillRect(blockX, blockY, blockW, blockH);
+    ctx.strokeRect(blockX, blockY, blockW, blockH);
+
+    ctx.fillStyle = '#000';
+    ctx.font = 'bold 16px Segoe UI';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(side.numSum.toString(), x, blockY + blockH/2);
+  }
+}
+
+function drawScale(ctx, centerX, eqData) {
+  const armY = 200;
+  const gap = 126;
+
+  const leftX = centerX - gap/2;
+  const rightX = centerX + gap/2;
+
+  ctx.fillStyle = '#444';
+  ctx.fillRect(centerX - 4, armY, 8, 30);
+
+  ctx.beginPath();
+  ctx.moveTo(leftX, armY);
+  ctx.lineTo(rightX, armY);
+  ctx.strokeStyle = '#000';
+  ctx.lineWidth = 4;
+  ctx.stroke();
+
+  drawPan(ctx, leftX, armY, eqData.left);
+  drawPan(ctx, rightX, armY, eqData.right);
+}
+
+/* -------------------- ŘEŠENÍ -------------------- */
+
+function solveSingle(eq) {
+  if (eq.b !== 0) return "Rovnice obsahuje y, ale není soustava.";
+  if (eq.a === 0) return eq.c === 0 ? "Nekonečně mnoho řešení" : "Žádné řešení";
+  return "x = " + (eq.c / eq.a);
+}
+
+function solveSystem(eq1, eq2) {
+  const {a:a1, b:b1, c:c1} = eq1;
+  const {a:a2, b:b2, c:c2} = eq2;
+
+  const D  = a1*b2 - a2*b1;
+  const Dx = c1*b2 - c2*b1;
+  const Dy = a1*c2 - a2*c1;
+
+  if (D === 0) {
+    if (Dx===0 && Dy===0) return "Nekonečně mnoho řešení";
+    return "Žádné řešení";
+  }
+
+  return `x = ${Dx/D}, y = ${Dy/D}`;
+}
+
+/* -------------------- OVLÁDÁNÍ -------------------- */
+
+function toggleSystem() {
+  document.getElementById("eq2box").style.display =
+    document.getElementById("systemCheck").checked ? "block" : "none";
+}
+
+function drawAll() {
+  const isSystem = document.getElementById("systemCheck").checked;
+  const canvas = document.getElementById("scaleCanvas");
+  const ctx = canvas.getContext("2d");
+
+  canvas.width = isSystem ? 700 : 350;
+  canvas.height = 260;
+
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  const eq1 = parseEquation(document.getElementById("eq1").value);
+  if (!eq1) return;
+
+  if (!isSystem) {
+    drawScale(ctx, canvas.width/2, eq1);
+    document.getElementById("solutionBox").textContent = solveSingle(eq1);
+    return;
+  }
+
+  const eq2 = parseEquation(document.getElementById("eq2").value);
+  if (!eq2) return;
+
+drawScale(ctx, canvas.width/4, eq1);
+drawScale(ctx, canvas.width * 5/8, eq2);
+
+  document.getElementById("solutionBox").textContent = solveSystem(eq1, eq2);
+}
+
+/* -------------------- ENTER -------------------- */
+
+document.getElementById("eq1").addEventListener("keydown", e => {
+  if (e.key === "Enter") drawAll();
+});
+
+document.getElementById("eq2").addEventListener("keydown", e => {
+  if (e.key === "Enter") drawAll();
+});
+
+/* -------------------- COPY -------------------- */
+
+async function copyImage() {
+  const canvas = document.getElementById('scaleCanvas');
+  canvas.toBlob(async (blob) => {
+    const item = new ClipboardItem({ "image/png": blob });
+    await navigator.clipboard.write([item]);
+  });
+}
+
+window.onload = () => {
+  document.getElementById("eq1").value = "3x + 5 = x + 9";
+  drawAll();
+};
+</script>
 
 </body>
 </html>
-
