@@ -1,233 +1,28 @@
-<!DOCTYPE html>
-<html lang="cs">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Váhové rovnice</title>
-  <style>
-    :root{--ink:#182236;--muted:#5e6878;--line:#ccd5e1;--blue:#3157a4}
-    *{box-sizing:border-box} body{margin:0;min-height:100vh;padding:28px 16px;color:var(--ink);background:linear-gradient(145deg,#e8f0f8,#f7f3ea);font-family:"Segoe UI",Arial,sans-serif}
-    .app{position:relative;width:min(980px,100%);margin:auto;padding:clamp(20px,4vw,38px);border:1px solid #d8dee7;border-radius:24px;background:#fffffff2;box-shadow:0 18px 55px #24375221}
-    h1{margin:0 0 24px;font-size:clamp(28px,5vw,42px)}
-    .controls{display:grid;grid-template-columns:minmax(230px,1fr) auto;gap:14px;align-items:end}.field{text-align:left}label{display:block;margin-bottom:7px;font-weight:700}
-    input[type=text]{width:100%;min-height:48px;padding:10px 14px;border:2px solid var(--line);border-radius:11px;color:var(--ink);background:#fff;font:600 19px "Segoe UI",Arial}
-    input[type=text]:focus{border-color:var(--blue);outline:0;box-shadow:0 0 0 4px #3157a421}
-    button,select{min-height:44px;padding:9px 14px;border:1px solid var(--line);border-radius:10px;color:var(--ink);background:#fff;font:650 15px "Segoe UI",Arial}
-    button{cursor:pointer}button:hover{background:#f2f5f9}button.primary{border-color:var(--blue);color:#fff;background:var(--blue)}button.primary:hover{background:#24427d}
-    .actions,.options{display:flex;flex-wrap:wrap;gap:8px}.options{gap:12px 20px;margin:18px 0;padding:15px 17px;align-items:center;border:1px solid var(--line);border-radius:12px;background:#f8fafc}.option{display:flex;gap:8px;align-items:center}.option label{margin:0}
-    .color-toggle{position:absolute;top:20px;right:20px;width:42px;min-height:42px;padding:0;border-radius:50%;font-size:24px;line-height:1}
-    dialog{width:min(470px,calc(100% - 28px));padding:24px;border:1px solid var(--line);border-radius:16px;color:var(--ink);box-shadow:0 20px 70px #17203342}dialog::backdrop{background:#17203366}.sheet-grid{display:grid;grid-template-columns:1fr 90px;gap:12px;align-items:center;margin:20px 0}.sheet-grid label{margin:0}.sheet-grid input{width:90px;min-height:42px;padding:6px 10px;border:2px solid var(--line);border-radius:9px;font:600 17px "Segoe UI",Arial}.dialog-actions{display:flex;justify-content:flex-end;gap:8px}.sheet-error{min-height:22px;color:#a92525;font-weight:650}
-    .message{min-height:24px;margin:10px 0 0;color:#a92525;font-weight:650}.canvas-wrap{margin-top:20px;overflow:hidden;border:1px solid var(--line);border-radius:17px;background:#fff}
-    canvas{display:block;width:100%;height:auto}.result{display:flex;min-height:72px;margin-top:18px;padding:14px;align-items:center;justify-content:center;border-radius:13px;background:#edf3ff;font-size:clamp(20px,4vw,28px);font-weight:750}
-    @media(max-width:680px){body{padding:0;background:#fff}.app{padding:20px 14px;border:0;border-radius:0;box-shadow:none}.controls{grid-template-columns:1fr}.options{align-items:flex-start;flex-direction:column}}
-    @media print{body{padding:0;background:#fff}.app{width:100%;padding:0;border:0;box-shadow:none}.controls,.options,.message,.color-toggle{display:none}.canvas-wrap,.result{border:1px solid #000}.result{color:#000;background:#fff}}
-  </style>
-</head>
-<body>
-<main class="app">
-  <button id="colorToggle" class="color-toggle" type="button" title="Přepnout na černobílý režim" aria-label="Přepnout na černobílý režim">◐</button>
-  <h1>Váhové rovnice</h1>
-  <div class="controls">
-    <div class="field"><label for="equation">Rovnice</label><input id="equation" type="text" autocomplete="off" aria-describedby="message" placeholder="Např. 3x + 5 = x + 9" readonly></div>
-    <div class="actions"><button class="primary" id="generate">Nová rovnice</button><button id="custom">Vlastní rovnice</button></div>
-  </div>
-  <div class="options" aria-label="Nastavení">
-    <div class="option"><label for="resultType">Výsledek:</label><select id="resultType"><option value="natural">přirozené číslo</option><option value="integer">celé číslo</option><option value="positive">kladné číslo</option><option value="any">jakýkoli</option></select></div>
-    <div class="option"><label for="constantType">Konstanty:</label><select id="constantType"><option value="natural">přirozená čísla</option><option value="negative">záporná čísla</option></select></div>
-    <button id="toggleResult">Skrýt výsledek</button><button id="copy">Kopírovat obrázek</button><button id="worksheet">Pracovní list</button><button id="worksheetAnswers" disabled>Výsledky k listu</button>
-  </div>
-  <div id="message" class="message" role="alert"></div>
-  <div class="canvas-wrap"><canvas id="scaleCanvas" width="1000" height="560" aria-label="Váhy znázorňující zadanou rovnici"></canvas></div>
-  <div id="solution" class="result" aria-live="polite"></div>
-</main>
-<dialog id="worksheetDialog">
-  <form method="dialog" id="worksheetForm">
-    <h2>Pracovní list</h2>
-    <div class="sheet-grid">
-      <label for="positiveCount">Jen kladné</label><input id="positiveCount" type="number" min="0" max="10" value="4">
-      <label for="integerCount">Jen celé</label><input id="integerCount" type="number" min="0" max="10" value="3">
-      <label for="fractionCount">I se zlomky</label><input id="fractionCount" type="number" min="0" max="10" value="3">
-    </div>
-    <div id="sheetError" class="sheet-error" role="alert"></div>
-    <div class="dialog-actions"><button value="cancel">Zrušit</button><button type="button" class="primary" id="downloadWorksheet">Stáhnout PDF</button></div>
-  </form>
-</dialog>
+<!doctype html><html lang="cs"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Váhové rovnice a soustavy</title>
+<style>
+:root{--i:#182236;--l:#ccd5e1;--b:#3157a4}*{box-sizing:border-box}body{margin:0;padding:28px 16px;min-height:100vh;color:var(--i);background:linear-gradient(145deg,#e8f0f8,#f7f3ea);font-family:Segoe UI,Arial}.app{position:relative;max-width:980px;margin:auto;padding:38px;border:1px solid #d8dee7;border-radius:24px;background:#fffffff2;box-shadow:0 18px 55px #24375221}h1{margin:0 0 18px;font-size:clamp(28px,5vw,42px)}button,select,input{min-height:44px;padding:9px 14px;border:1px solid var(--l);border-radius:10px;color:var(--i);background:#fff;font:650 15px Segoe UI,Arial}button{cursor:pointer}.primary,.switch .on{border-color:var(--b);color:#fff;background:var(--b)}.switch{display:inline-flex;margin-bottom:22px;padding:4px;border:1px solid var(--l);border-radius:13px;background:#eef2f7}.switch button{min-width:120px;border:0;background:transparent}.controls{display:grid;grid-template-columns:1fr auto;gap:14px;align-items:end}label{display:block;margin-bottom:7px;font-weight:700}.inputs{display:grid;gap:8px}input[type=text]{width:100%;min-height:48px;border:2px solid var(--l);font-size:19px}.actions,.options{display:flex;flex-wrap:wrap;gap:8px}.options{gap:12px 20px;margin:18px 0;padding:15px 17px;align-items:center;border:1px solid var(--l);border-radius:12px;background:#f8fafc}.option{display:flex;gap:8px;align-items:center}.option label{margin:0}.color{position:absolute;right:20px;top:20px;width:42px;padding:0;border-radius:50%;font-size:23px}.hide{display:none!important}.message{min-height:24px;margin-top:10px;color:#a92525;font-weight:650}.canvas-wrap{margin-top:20px;overflow:hidden;border:1px solid var(--l);border-radius:17px;background:#fff}canvas{display:block;width:100%;height:auto}.result{display:flex;min-height:72px;margin-top:18px;padding:14px;align-items:center;justify-content:center;border-radius:13px;background:#edf3ff;font-size:clamp(20px,4vw,28px);font-weight:750}dialog{width:min(470px,calc(100% - 28px));padding:24px;border:1px solid var(--l);border-radius:16px}.grid{display:grid;grid-template-columns:1fr 90px;gap:12px;align-items:center;margin:20px 0}.grid label{margin:0}.grid input{width:90px}.dlg{display:flex;justify-content:flex-end;gap:8px}.error{min-height:22px;color:#a92525;font-weight:650}@media(max-width:680px){body{padding:0}.app{padding:20px 14px;border:0}.controls{grid-template-columns:1fr}.options{align-items:flex-start;flex-direction:column}}@media print{.controls,.options,.message,.color,.switch{display:none}}
+</style></head><body><main class="app"><button id="color" class="color">◐</button><h1 id="title">Váhové rovnice</h1><div class="switch"><button id="one" class="on">Rovnice</button><button id="two">Soustavy</button></div>
+<div class="controls"><div><label id="inputLabel">Rovnice</label><div class="inputs"><input id="e1" readonly><input id="e2" class="hide" readonly></div></div><div class="actions"><button id="generate" class="primary">Nová rovnice</button><button id="custom">Vlastní rovnice</button></div></div>
+<div class="options"><div class="option"><label id="diffLabel" for="diff">Výsledek:</label><select id="diff"><option value="natural">přirozené číslo</option><option value="integer">celé číslo</option><option value="positive">kladné číslo</option><option value="any">jakýkoli</option></select></div><div id="constants" class="option"><label>Konstanty:</label><select id="const"><option value="natural">přirozená čísla</option><option value="negative">záporná čísla</option></select></div><button id="toggle">Skrýt výsledek</button><button id="copy">Kopírovat obrázek</button><button id="worksheet">Pracovní list</button><button id="answers" disabled>Výsledky k listu</button></div>
+<div id="message" class="message"></div><div class="canvas-wrap"><canvas id="canvas"></canvas></div><div id="solution" class="result"></div></main>
+<dialog id="dialog"><h2 id="dialogTitle">Pracovní list</h2><div id="singleSettings" class="grid"><label>Jen kladné</label><input id="pc" type="number" min="0" max="10" value="4"><label>Jen celé</label><input id="ic" type="number" min="0" max="10" value="3"><label>I se zlomky</label><input id="fc" type="number" min="0" max="10" value="3"></div><p id="systemInfo" class="hide">List bude obsahovat 6 soustav ve zvolené obtížnosti, uspořádaných 2 × 3.</p><div id="sheetError" class="error"></div><div class="dlg"><button onclick="dialog.close()">Zrušit</button><button id="download" class="primary">Stáhnout PDF</button></div></dialog>
 <script>
-"use strict";
-const $=id=>document.getElementById(id), input=$("equation"),canvas=$("scaleCanvas"),ctx=canvas.getContext("2d"),message=$("message"),solution=$("solution"),resultType=$("resultType"),constantType=$("constantType"),toggle=$("toggleResult"),colorToggle=$("colorToggle"),worksheetDialog=$("worksheetDialog");
-let current=null,resultVisible=true,monochrome=false,lastWorksheetEquations=[];
-
-function parseSide(raw){
-  const compact=raw.toLowerCase().replace(/,/g,".").replace(/[−–]/g,"-").replace(/\s+/g,"");
-  if(!compact)throw Error("Na obou stranách rovnice musí být výraz.");
-  const normalized=/^[+-]/.test(compact)?compact:"+"+compact;
-  const terms=normalized.match(/[+-][^+-]+/g);
-  if(!terms||terms.join("")!==normalized)throw Error("Výraz se nepodařilo přečíst.");
-  let xCount=0,units=0;
-  for(const term of terms){
-    if(/^[+-](?:\d+(?:\.\d+)?)?x$/.test(term)){
-      const c=term.slice(0,-1);xCount+=c==="+"?1:c==="-"?-1:Number(c);
-    }else if(/^[+-]\d+(?:\.\d+)?$/.test(term))units+=Number(term);
-    else throw Error(`Členu „${term.slice(1)}“ nerozumím. Použij jen x, čísla, + a −.`);
-  }
-  return{xCount,units};
-}
-function parseEquation(raw){
-  const parts=raw.split("=");
-  if(parts.length!==2)throw Error("Rovnice musí obsahovat právě jedno rovnítko.");
-  const eq={left:parseSide(parts[0]),right:parseSide(parts[1])};
-  for(const side of [eq.left,eq.right]){
-    if(!Number.isInteger(side.xCount)||!Number.isInteger(side.units))throw Error("Koeficient i konstanta musí být celá čísla.");
-    if(side.xCount<0)throw Error("Počet koulí na misce nemůže být záporný.");
-    if(side.xCount>6)throw Error("Koeficient u x může být nejvýše 6.");
-    if(side.units < -15 || side.units > 15)throw Error("Konstanta musí být od −15 do 15.");
-  }
-  return eq;
-}
-function gcd(a,b){a=Math.abs(a);b=Math.abs(b);while(b)[a,b]=[b,a%b];return a}
-function solutionText(eq){
-  const a=eq.left.xCount-eq.right.xCount,c=eq.right.units-eq.left.units;
-  if(a===0)return c===0?"Nekonečně mnoho řešení":"Rovnice nemá řešení";
-  let n=c,d=a;if(d<0){n=-n;d=-d}const g=gcd(n,d);n/=g;d/=g;
-  return d===1?`Výsledek: x = ${n}`:`Výsledek: x = ${n}/${d}`;
-}
-function solutionValue(eq){
-  let numerator=eq.right.units-eq.left.units,denominator=eq.left.xCount-eq.right.xCount;
-  if(denominator<0){numerator=-numerator;denominator=-denominator}
-  const divisor=gcd(numerator,denominator);numerator/=divisor;denominator/=divisor;
-  return denominator===1?`x = ${numerator}`:`x = ${numerator}/${denominator}`;
-}
-const randomInt=(min,max)=>Math.floor(Math.random()*(max-min+1))+min;
-function createEquation(mode){
-  const negativeConstants=constantType.value==="negative";
-  for(let tries=0;tries<20000;tries++){
-    const a=randomInt(1,6),c=randomInt(1,6);if(a===c)continue;
-    const min=negativeConstants?-15:1,b=randomInt(min,15),d=randomInt(min,15);
-    if(negativeConstants&&b>=0&&d>=0)continue;
-    let numerator=d-b,denominator=a-c;
-    if(denominator<0){numerator=-numerator;denominator=-denominator}
-    const divisor=gcd(numerator,denominator),reducedNumerator=numerator/divisor,reducedDenominator=denominator/divisor;
-    if(reducedNumerator===0)continue;
-    const simpleFraction=reducedDenominator>=2&&reducedDenominator<=5;
-    if(mode==="natural"&&(reducedDenominator!==1||reducedNumerator<1))continue;
-    if(mode==="integer"&&reducedDenominator!==1)continue;
-    if(mode==="positive"&&(!simpleFraction||reducedNumerator<1))continue;
-    if(mode==="fractionAny"&&(!simpleFraction||reducedNumerator===0))continue;
-    if(mode==="any"&&reducedDenominator!==1&&!simpleFraction)continue;
-    const side=(coef,num)=>`${coef===1?"":coef}x${num>0?` + ${num}`:num<0?` − ${Math.abs(num)}`:""}`;
-    return{eq:{left:{xCount:a,units:b},right:{xCount:c,units:d}},text:`${side(a,b)} = ${side(c,d)}`};
-  }
-  return null;
-}
-function generateEquation(){
-  const generated=createEquation(resultType.value);
-  if(!generated){showError("Novou rovnici se nepodařilo vytvořit. Zkus to znovu.");return}
-  input.readOnly=true;input.value=generated.text;drawAll();
-}
-function palette(){return monochrome?{bg:"#fff",ink:"#000",metal:"#fff",dark:"#000",ball:"#aaa",constant:"#fff"}:{bg:"#fbfdff",ink:"#172033",metal:"#7e8da3",dark:"#3c485a",ball:"#5f87d7",constant:"#fff4dc"}}
-function layout(side){
-  const size=16,step=36,blockWidth=68,gap=side.xCount?10:0,rows=side.xCount>3?2:1;
-  const bottomCount=Math.min(3,side.xCount),topCount=Math.max(0,side.xCount-3),ballColumns=Math.max(bottomCount,topCount),ballAreaWidth=ballColumns*step;
-  const contentWidth=Math.max(68,ballAreaWidth+gap+blockWidth);
-  return{size,step,blockWidth,contentWidth,panWidth:Math.max(105,contentWidth+30),rows,bottomCount,topCount,ballAreaWidth};
-}
-function drawBall(x,y,size,p){
-  ctx.save();ctx.strokeStyle=p.ink;ctx.lineWidth=Math.max(1.5,size*.11);
-  ctx.beginPath();ctx.arc(x,y,size,0,Math.PI*2);ctx.fillStyle=p.ball;ctx.fill();ctx.stroke();
-  if(!monochrome){ctx.beginPath();ctx.arc(x-size*.3,y-size*.32,size*.22,0,Math.PI*2);ctx.fillStyle="#ffffff88";ctx.fill()}
-  ctx.restore();
-}
-function drawConstant(x,y,value,l,p){
-  const h=l.blockWidth;ctx.save();ctx.fillStyle=p.constant;ctx.strokeStyle=p.ink;ctx.lineWidth=2;ctx.beginPath();ctx.roundRect(x-l.blockWidth/2,y-h/2,l.blockWidth,h,5);ctx.fill();ctx.stroke();ctx.fillStyle=p.ink;ctx.font="700 27px Segoe UI,Arial";ctx.textAlign="center";ctx.textBaseline="middle";ctx.fillText(String(value),x,y+1);ctx.restore();
-}
-function drawPan(centerX,armY,data,l,p){
-  const rimY=armY-13,panWidth=l.panWidth;ctx.save();
-  ctx.beginPath();ctx.moveTo(centerX-panWidth/2,rimY);ctx.quadraticCurveTo(centerX,rimY+25,centerX+panWidth/2,rimY);ctx.strokeStyle=p.dark;ctx.lineWidth=6;ctx.stroke();ctx.strokeStyle=p.ink;ctx.lineWidth=2;ctx.stroke();
-  const ballLeft=centerX-l.contentWidth/2,bottomY=rimY-l.size-5;
-  const drawRow=(count,y)=>{const start=ballLeft+(l.ballAreaWidth-(count-1)*l.step)/2;for(let i=0;i<count;i++)drawBall(start+i*l.step,y,l.size,p)};
-  drawRow(l.bottomCount,bottomY);if(l.topCount)drawRow(l.topCount,bottomY-l.step);
-  const constantX=centerX+l.contentWidth/2-l.blockWidth/2;
-  drawConstant(constantX,rimY-l.blockWidth/2-4,data.units,l,p);
-  ctx.restore();
-}
-function drawScale(eq){
-  const p=palette(),W=700,L=layout(eq.left),R=layout(eq.right),twoRows=L.rows===2||R.rows===2,H=twoRows?270:245,dpr=Math.min(devicePixelRatio||1,2);
-  canvas.width=W*dpr;canvas.height=H*dpr;canvas.style.aspectRatio=`${W}/${H}`;ctx.setTransform(dpr,0,0,dpr,0,0);ctx.fillStyle=p.bg;ctx.fillRect(0,0,W,H);
-  const armY=twoRows?145:120,cx=W/2,leftX=180,rightX=520;
-  ctx.fillStyle=p.metal;ctx.strokeStyle=p.ink;ctx.lineWidth=3;ctx.beginPath();ctx.roundRect(cx-12,armY+4,24,82,7);ctx.fill();ctx.stroke();ctx.beginPath();ctx.moveTo(cx-55,armY+86);ctx.lineTo(cx+55,armY+86);ctx.lineTo(cx+80,armY+108);ctx.lineTo(cx-80,armY+108);ctx.closePath();ctx.fill();ctx.stroke();
-  ctx.strokeStyle=p.ink;ctx.lineWidth=9;ctx.lineCap="round";ctx.beginPath();ctx.moveTo(leftX,armY);ctx.lineTo(rightX,armY);ctx.stroke();ctx.fillStyle=p.bg;ctx.beginPath();ctx.arc(cx,armY,13,0,Math.PI*2);ctx.fill();ctx.strokeStyle=p.ink;ctx.lineWidth=3;ctx.stroke();
-  drawPan(leftX,armY,eq.left,L,p);drawPan(rightX,armY,eq.right,R,p);
-}
-function showError(text){message.textContent=text;input.setAttribute("aria-invalid","true")}
-function clearError(){message.textContent="";input.removeAttribute("aria-invalid")}
-function updateSolution(){if(!current)return;solution.textContent=resultVisible?solutionText(current):"Výsledek je skrytý";toggle.textContent=resultVisible?"Skrýt výsledek":"Ukázat výsledek";toggle.setAttribute("aria-pressed",String(!resultVisible))}
-function drawAll(){clearError();try{current=parseEquation(input.value);input.readOnly=true;drawScale(current);updateSolution()}catch(error){showError(error.message);input.focus()}}
-async function copyImage(){clearError();try{const blob=await new Promise(resolve=>canvas.toBlob(resolve,"image/png"));if(!blob)throw Error();await navigator.clipboard.write([new ClipboardItem({"image/png":blob})])}catch{showError("Obrázek se nepodařilo zkopírovat. Prohlížeč možná nepovolil přístup ke schránce.")}}
-const ascii=text=>new TextEncoder().encode(text);
-function joinBytes(parts){const length=parts.reduce((sum,part)=>sum+part.length,0),result=new Uint8Array(length);let offset=0;for(const part of parts){result.set(part,offset);offset+=part.length}return result}
-function jpegBytes(dataUrl){const binary=atob(dataUrl.split(",")[1]),bytes=new Uint8Array(binary.length);for(let i=0;i<binary.length;i++)bytes[i]=binary.charCodeAt(i);return bytes}
-function makePdf(images,captions=[]){
-  const withAnswers=captions.length>0,pageWidth=595.28,pageHeight=841.89,margin=withAnswers?20:8,gap=withAnswers?8:4,columns=2,rows=5,itemsPerPage=10;
-  const pageCount=Math.ceil(images.length/itemsPerPage),pageIds=Array.from({length:pageCount},(_,i)=>3+i),contentIds=Array.from({length:pageCount},(_,i)=>3+pageCount+i),imageBase=3+pageCount*2,imageIds=images.map((_,i)=>imageBase+i),objects=[];
-  objects[1]=ascii("<< /Type /Catalog /Pages 2 0 R >>");
-  objects[2]=ascii(`<< /Type /Pages /Kids [${pageIds.map(id=>`${id} 0 R`).join(" ")}] /Count ${pageCount} >>`);
-  for(let page=0;page<pageCount;page++){
-    const first=page*itemsPerPage,last=Math.min(first+itemsPerPage,images.length),resources=[],commands=[];
-    const cellWidth=(pageWidth-margin*2-gap)/columns,cellHeight=(pageHeight-margin*2-gap*(rows-1))/rows;
-    for(let index=first;index<last;index++){
-      const local=index-first+1,image=images[index],column=(index-first)%2,row=Math.floor((index-first)/2);
-      const drawWidth=withAnswers?cellWidth*.92:cellWidth,drawHeight=Math.min(cellHeight-(withAnswers?24:0),drawWidth*image.height/image.width),x=margin+column*(cellWidth+gap)+(cellWidth-drawWidth)/2,cellTop=pageHeight-margin-row*(cellHeight+gap),groupHeight=drawHeight+(withAnswers?22:0),groupBottom=cellTop-cellHeight+(cellHeight-groupHeight)/2,y=groupBottom+(withAnswers?22:0);
-      resources.push(`/Im${local} ${imageIds[index]} 0 R`);commands.push(`q ${drawWidth.toFixed(2)} 0 0 ${drawHeight.toFixed(2)} ${x.toFixed(2)} ${y.toFixed(2)} cm /Im${local} Do Q`);
-      if(withAnswers){const caption=captions[index],textX=x+drawWidth/2-caption.length*3.25;commands.push(`BT /F1 13 Tf ${textX.toFixed(2)} ${(groupBottom+3).toFixed(2)} Td (${caption}) Tj ET`)}
-    }
-    const content=ascii(commands.join("\n"));
-    objects[contentIds[page]]=joinBytes([ascii(`<< /Length ${content.length} >>\nstream\n`),content,ascii("\nendstream")]);
-    const font=withAnswers?" /Font << /F1 << /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >> >>":"";
-    objects[pageIds[page]]=ascii(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pageWidth} ${pageHeight}] /Resources << /XObject << ${resources.join(" ")} >>${font} >> /Contents ${contentIds[page]} 0 R >>`);
-  }
-  images.forEach((image,index)=>{objects[imageIds[index]]=joinBytes([ascii(`<< /Type /XObject /Subtype /Image /Width ${image.width} /Height ${image.height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${image.bytes.length} >>\nstream\n`),image.bytes,ascii("\nendstream")])});
-  const parts=[ascii("%PDF-1.4\n")],offsets=[0];let position=parts[0].length;
-  for(let id=1;id<objects.length;id++){offsets[id]=position;const object=joinBytes([ascii(`${id} 0 obj\n`),objects[id],ascii("\nendobj\n")]);parts.push(object);position+=object.length}
-  const xrefPosition=position,xref=[`xref\n0 ${objects.length}\n0000000000 65535 f \n`];for(let id=1;id<objects.length;id++)xref.push(`${String(offsets[id]).padStart(10,"0")} 00000 n \n`);
-  parts.push(ascii(xref.join("")+`trailer\n<< /Size ${objects.length} /Root 1 0 R >>\nstartxref\n${xrefPosition}\n%%EOF`));
-  return new Blob(parts,{type:"application/pdf"});
-}
-function equationImage(eq,cropped){
-  drawScale(eq);
-  if(!cropped)return{bytes:jpegBytes(canvas.toDataURL("image/jpeg",.94)),width:canvas.width,height:canvas.height};
-  const dpr=canvas.width/700,cropX=Math.round(50*dpr),cropY=Math.round(7*dpr),cropWidth=Math.round(600*dpr),cropHeight=canvas.height-Math.round(14*dpr),target=document.createElement("canvas");
-  target.width=cropWidth;target.height=cropHeight;target.getContext("2d").drawImage(canvas,cropX,cropY,cropWidth,cropHeight,0,0,cropWidth,cropHeight);
-  return{bytes:jpegBytes(target.toDataURL("image/jpeg",.94)),width:cropWidth,height:cropHeight};
-}
-function savePdf(blob,filename){
-  const url=URL.createObjectURL(blob),link=document.createElement("a");link.href=url;link.download=filename;link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
-}
-function downloadWorksheet(){
-  const counts=[$("positiveCount"),$("integerCount"),$("fractionCount")].map(field=>Number(field.value)),error=$("sheetError"),button=$("downloadWorksheet");
-  if(counts.some(value=>!Number.isInteger(value)||value<0||value>10)||counts.reduce((a,b)=>a+b,0)!==10){error.textContent="Součet počtů musí být přesně 10.";return}
-  error.textContent="";button.disabled=true;button.textContent="Vytvářím…";
-  try{
-    const modes=[["natural",counts[0]],["integer",counts[1]],["fractionAny",counts[2]]],equations=[],used=new Set();
-    for(const [mode,count] of modes)for(let i=0;i<count;i++){let generated;for(let retry=0;retry<100;retry++){generated=createEquation(mode);if(generated&&!used.has(generated.text))break}if(!generated||used.has(generated.text))throw Error();used.add(generated.text);equations.push(generated.eq)}
-    const images=equations.map(eq=>equationImage(eq,true));
-    lastWorksheetEquations=equations;$("worksheetAnswers").disabled=false;
-    if(current)drawScale(current);
-    savePdf(makePdf(images),"pracovni-list-vahove-rovnice.pdf");worksheetDialog.close();
-  }catch{error.textContent="Pracovní list se nepodařilo vytvořit. Zkus jiné nastavení."}
-  finally{button.disabled=false;button.textContent="Stáhnout PDF"}
-}
-function downloadWorksheetAnswers(){
-  if(!lastWorksheetEquations.length)return;
-  const button=$("worksheetAnswers");button.disabled=true;button.textContent="Vytvářím…";
-  try{
-    const images=lastWorksheetEquations.map(eq=>equationImage(eq,false)),captions=lastWorksheetEquations.map(solutionValue);
-    savePdf(makePdf(images,captions),"vysledky-pracovniho-listu.pdf");
-  }catch{showError("Soubor s výsledky se nepodařilo vytvořit.")}
-  finally{if(current)drawScale(current);button.disabled=false;button.textContent="Výsledky k listu"}
-}
-$("generate").addEventListener("click",generateEquation);$("custom").addEventListener("click",()=>{input.readOnly=false;input.focus();input.select()});$("copy").addEventListener("click",copyImage);colorToggle.addEventListener("click",()=>{monochrome=!monochrome;colorToggle.textContent=monochrome?"●":"◐";const label=monochrome?"Přepnout na barevný režim":"Přepnout na černobílý režim";colorToggle.title=label;colorToggle.setAttribute("aria-label",label);if(current)drawScale(current)});toggle.addEventListener("click",()=>{resultVisible=!resultVisible;updateSolution()});input.addEventListener("keydown",e=>{if(e.key==="Enter")drawAll()});
-$("worksheet").addEventListener("click",()=>{if(typeof worksheetDialog.showModal==="function")worksheetDialog.showModal();else worksheetDialog.setAttribute("open","")});$("downloadWorksheet").addEventListener("click",downloadWorksheet);$("worksheetAnswers").addEventListener("click",downloadWorksheetAnswers);
-input.value="3x + 5 = x + 9";drawAll();
-</script>
-</body>
-</html>
+"use strict";const $=x=>document.getElementById(x),cv=$("canvas"),c=cv.getContext("2d"),ins=[$("e1"),$("e2")];let mode="one",cur,visible=true,mono=false,last=[];const ri=(a,b)=>Math.floor(Math.random()*(b-a+1))+a;function gcd(a,b){a=Math.abs(a);b=Math.abs(b);while(b)[a,b]=[b,a%b];return a||1}function frac(n,d){if(d<0)n=-n,d=-d;let g=gcd(n,d);return[n/g,d/g]}function num(q){return q[1]===1?""+q[0]:q.join("/")}
+function parseSide(s,y=false){s=s.toLowerCase().replace(/[−–]/g,"-").replace(/\s/g,"");if(!s)throw Error("Na obou stranách musí být výraz.");s=/^[+-]/.test(s)?s:"+"+s;let ts=s.match(/[+-][^+-]+/g),o={x:0,y:0,c:0};if(!ts||ts.join("")!==s)throw Error("Výraz se nepodařilo přečíst.");for(let t of ts){let v=t.endsWith("x")?"x":t.endsWith("y")?"y":null;if(v){if(v==="y"&&!y)throw Error("Zde použij jen x.");let a=t.slice(0,-1);if(!/^[+-]\d*$/.test(a))throw Error("Neplatný člen.");o[v]+=a==="+"?1:a==="-"?-1:+a}else if(/^[+-]\d+$/.test(t))o.c+=+t;else throw Error("Použij x, "+(y?"y, ":"")+"celá čísla, + a −.")}return o}
+function parseEq(s,y=false){let p=s.split("=");if(p.length!==2)throw Error("Každá rovnice musí mít právě jedno rovnítko.");let e={left:parseSide(p[0],y),right:parseSide(p[1],y)};for(let z of [e.left,e.right])if(z.x<0||z.y<0||z.x+z.y>7||Math.abs(z.c)>15)throw Error("Na misce smí být nejvýše 7 tvarů a konstanta od −15 do 15.");return e}function norm(e){return{a:e.left.x-e.right.x,b:e.left.y-e.right.y,d:e.right.c-e.left.c}}function solve(es){if(!Array.isArray(es)){let p=norm(es);return p.a?frac(p.d,p.a):null}let p=norm(es[0]),q=norm(es[1]),d=p.a*q.b-q.a*p.b;if(!d)return null;return{x:frac(p.d*q.b-q.d*p.b,d),y:frac(p.a*q.d-q.a*p.d,d)}}
+function side(s,y=false){let a=[];function add(n,v){if(!n)return;let z=(Math.abs(n)==1?"":Math.abs(n))+v;a.push(a.length?(n>0?"+ ":"− ")+z:(n<0?"−":"")+z)}add(s.x,"x");if(y)add(s.y,"y");if(s.c||!a.length)a.push(a.length?(s.c>=0?"+ "+s.c:"− "+Math.abs(s.c)):""+s.c);return a.join(" ")}function text(e,y=false){return side(e.left,y)+" = "+side(e.right,y)}
+function makeOne(kind){let neg=$("const").value==="negative";for(let k=0;k<2e4;k++){let a=ri(1,6),d=ri(1,6);if(a===d)continue;let b=ri(neg?-15:1,15),z=ri(neg?-15:1,15);if(b===0||z===0)continue;let q=frac(z-b,a-d);if(!q[0])continue;if(kind==="natural"&&(q[1]!=1||q[0]<1)||kind==="integer"&&q[1]!=1||kind==="positive"&&(q[1]<2||q[1]>5||q[0]<1)||kind==="fraction"&&(q[1]<2||q[1]>5)||kind==="any"&&q[1]>5)continue;let e={left:{x:a,y:0,c:b},right:{x:d,y:0,c:z}};return{data:e,lines:[text(e)]}}}
+function val(kind){return kind==="natural"?ri(1,8):kind==="integer"?ri(-8,8):ri(1,16)/2}function makeSystem(kind){for(let k=0;k<1e4;k++){let x=val(kind),y=val(kind),es=[];for(let r=0;r<2;r++){let a=ri(1,4),b=ri(1,4),u=ri(0,a),v=ri(0,b),lc=ri(1,6),rc=lc+(a-u)*x+(b-v)*y;if(a+b>7||u+v>7||!Number.isInteger(rc)||rc<1||rc>15){r--;continue}es.push({left:{x:a,y:b,c:lc},right:{x:u,y:v,c:rc}})}let s=solve(es);if(s&&s.x[0]/s.x[1]===x&&s.y[0]/s.y[1]===y)return{data:es,lines:es.map(e=>text(e,true))}}}
+function pal(){return mono?{bg:"#fff",ink:"#000",metal:"#fff",x:"#aaa",y:"#fff",box:"#fff"}:{bg:"#fbfdff",ink:"#172033",metal:"#8997ad",x:"#5f87d7",y:"#e8a04b",box:"#fff3d9"}}
+function shape(x,y,t,p){c.save();c.strokeStyle=p.ink;c.lineWidth=2;if(t==="x"){c.beginPath();c.arc(x,y,14,0,Math.PI*2);c.fillStyle=p.x;c.fill();c.stroke();if(!mono){c.beginPath();c.arc(x-5,y-6,3.5,0,Math.PI*2);c.fillStyle="#ffffff88";c.fill()}}else{c.beginPath();c.moveTo(x,y-16);c.lineTo(x-15,y+11);c.quadraticCurveTo(x,y+16,x+15,y+11);c.closePath();c.fillStyle=p.y;c.fill();c.stroke();if(!mono){c.beginPath();c.moveTo(x-2,y-10);c.lineTo(x-8,y+7);c.strokeStyle="#ffffff66";c.lineWidth=2;c.stroke()}}c.restore()}
+function constant(x,y,value,p){c.save();c.fillStyle=p.box;c.strokeStyle=p.ink;c.lineWidth=2;c.beginPath();c.roundRect(x-29,y-29,58,58,6);c.fill();c.stroke();c.fillStyle=p.ink;c.font="700 24px Segoe UI,Arial";c.textAlign="center";c.textBaseline="middle";c.fillText(value,x,y+1);c.restore()}
+function pan(x,arm,s,p){let rim=arm-16,types=[];for(let i=0;i<s.x;i++)types.push("x");for(let i=0;i<s.y;i++)types.push("y");let cols=Math.min(3,types.length),shapeCenter=types.length?x-38:x,step=33;c.save();c.strokeStyle=p.ink;c.lineCap="round";c.beginPath();c.moveTo(x-86,rim);c.quadraticCurveTo(x,arm-1,x+86,rim);c.lineWidth=5;c.stroke();c.strokeStyle=p.metal;c.lineWidth=2;c.beginPath();c.moveTo(x-84,rim-1);c.quadraticCurveTo(x,arm-4,x+84,rim-1);c.stroke();types.forEach((t,i)=>{let row=Math.floor(i/3),count=Math.min(3,types.length-row*3),xx=shapeCenter-(count-1)*step/2+(i%3)*step,yy=rim-16-row*34;shape(xx,yy,t,p)});constant(types.length?x+47:x,rim-31,s.c,p);c.restore()}
+function scale(e,top,h,p){let arm=top+h*.58,x=350,left=175,right=525;c.save();c.fillStyle=p.metal;c.strokeStyle=p.ink;c.lineWidth=2;c.beginPath();c.roundRect(x-9,arm+2,18,h*.29,5);c.fill();c.stroke();c.beginPath();c.moveTo(x-48,arm+h*.31);c.lineTo(x+48,arm+h*.31);c.lineTo(x+68,arm+h*.39);c.lineTo(x-68,arm+h*.39);c.closePath();c.fill();c.stroke();c.strokeStyle=p.ink;c.lineWidth=8;c.lineCap="round";c.beginPath();c.moveTo(left,arm);c.lineTo(right,arm);c.stroke();c.fillStyle=p.bg;c.beginPath();c.arc(x,arm,11,0,Math.PI*2);c.fill();c.strokeStyle=p.ink;c.lineWidth=2.5;c.stroke();pan(left,arm,e.left,p);pan(right,arm,e.right,p);c.restore()}
+function draw(data=cur){let p=pal(),W=700,H=mode==="two"?490:260,d=Math.min(devicePixelRatio||1,2);cv.width=W*d;cv.height=H*d;cv.style.aspectRatio=W+"/"+H;c.setTransform(d,0,0,d,0,0);c.fillStyle=p.bg;c.fillRect(0,0,W,H);c.strokeStyle=p.ink;if(mode==="two"){scale(data[0],0,235,p);scale(data[1],245,235,p)}else scale(data,0,245,p)}
+function update(){if(!cur)return;if(!visible)$("solution").textContent="Výsledek je skrytý";else{let s=solve(cur);$("solution").textContent=mode==="two"?(s?"Výsledek: x = "+num(s.x)+", y = "+num(s.y):"Soustava nemá právě jedno řešení"):(s?"Výsledek: x = "+num(s):"Rovnice nemá právě jedno řešení")} $("toggle").textContent=visible?"Skrýt výsledek":"Ukázat výsledek"}function drawAll(){try{$("message").textContent="";cur=mode==="two"?ins.map(i=>parseEq(i.value,true)):parseEq(ins[0].value);draw();update()}catch(e){$("message").textContent=e.message}}
+function generate(){let g=mode==="two"?makeSystem($("diff").value):makeOne($("diff").value);if(!g)return;g.lines.forEach((s,i)=>ins[i].value=s);ins.forEach(i=>i.readOnly=true);drawAll()}function setMode(m){mode=m;$("one").classList.toggle("on",m==="one");$("two").classList.toggle("on",m==="two");$("e2").classList.toggle("hide",m==="one");$("constants").classList.toggle("hide",m==="two");$("title").textContent=m==="two"?"Váhové soustavy":"Váhové rovnice";$("inputLabel").textContent=m==="two"?"Soustava rovnic":"Rovnice";$("generate").textContent=m==="two"?"Nová soustava":"Nová rovnice";$("custom").textContent=m==="two"?"Vlastní soustava":"Vlastní rovnice";$("diffLabel").textContent=m==="two"?"Obtížnost:":"Výsledek:";$("diff").innerHTML=m==="two"?'<option value="natural">přirozená čísla</option><option value="integer">celá čísla</option><option value="positive">kladná čísla</option>':'<option value="natural">přirozené číslo</option><option value="integer">celé číslo</option><option value="positive">kladné číslo</option><option value="any">jakýkoli</option>';last=[];$("answers").disabled=true;generate()}
+const ascii=s=>new TextEncoder().encode(s);function jpeg(data){let b=atob(data.split(",")[1]),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);return u}function pdf(images){let W=595,H=842,rows=mode==="two"?3:5,ids=images.map((_,i)=>5+i),cmd=[],res=[],ch=(H-24-(rows-1)*6)/rows;cmd.push("0 G 1 w "+(W/2)+" 0 m "+(W/2)+" "+H+" l S");for(let r=1;r<rows;r++){let y=H-12-r*(ch+6)+3;cmd.push("0 G 1 w 0 "+y.toFixed(2)+" m "+W+" "+y.toFixed(2)+" l S")}images.forEach((im,i)=>{let col=i%2,row=Math.floor(i/2),cw=285,dw=cw,dh=Math.min(ch,dw*im.height/im.width),x=10+col*291,y=H-12-row*(ch+6)-dh;res.push('/I'+i+' '+ids[i]+' 0 R');cmd.push('q '+dw+' 0 0 '+dh+' '+x+' '+y+' cm /I'+i+' Do Q')});let objs=[,ascii("<< /Type /Catalog /Pages 2 0 R >>"),ascii("<< /Type /Pages /Kids [3 0 R] /Count 1 >>"),ascii("<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /XObject << "+res.join(" ")+" >> >> /Contents 4 0 R >>")],stream=ascii(cmd.join("\n"));objs[4]=join([ascii("<< /Length "+stream.length+" >>\nstream\n"),stream,ascii("\nendstream")]);images.forEach((im,i)=>objs[5+i]=join([ascii("<< /Type /XObject /Subtype /Image /Width "+im.width+" /Height "+im.height+" /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length "+im.bytes.length+" >>\nstream\n"),im.bytes,ascii("\nendstream")]));let out=[ascii("%PDF-1.4\n")],off=[0],pos=9;for(let i=1;i<objs.length;i++){off[i]=pos;let o=join([ascii(i+" 0 obj\n"),objs[i],ascii("\nendobj\n")]);out.push(o);pos+=o.length}let xr=pos,s="xref\n0 "+objs.length+"\n0000000000 65535 f \n";for(let i=1;i<objs.length;i++)s+=String(off[i]).padStart(10,"0")+" 00000 n \n";out.push(ascii(s+"trailer\n<< /Size "+objs.length+" /Root 1 0 R >>\nstartxref\n"+xr+"\n%%EOF"));return new Blob(out,{type:"application/pdf"})}function join(ps){let n=ps.reduce((a,b)=>a+b.length,0),u=new Uint8Array(n),o=0;ps.forEach(p=>{u.set(p,o);o+=p.length});return u}function save(b,n){let u=URL.createObjectURL(b),a=document.createElement("a");a.href=u;a.download=n;a.click();setTimeout(()=>URL.revokeObjectURL(u),1000)}
+function download(){try{let items=[];if(mode==="two"){for(let i=0;i<6;i++)items.push(makeSystem($("diff").value).data)}else{let ns=[$("pc"),$("ic"),$("fc")].map(x=>+x.value);if(ns.reduce((a,b)=>a+b,0)!==10)throw Error("Součet počtů musí být přesně 10.");[["natural",ns[0]],["integer",ns[1]],["fraction",ns[2]]].forEach(([k,n])=>{for(let i=0;i<n;i++)items.push(makeOne(k).data)})}last=items;let saved=cur,ims=items.map(x=>{draw(x);return{bytes:jpeg(cv.toDataURL("image/jpeg",.92)),width:cv.width,height:cv.height}});cur=saved;draw();save(pdf(ims),mode==="two"?"pracovni-list-vahove-soustavy.pdf":"pracovni-list-vahove-rovnice.pdf");$("answers").disabled=false;dialog.close()}catch(e){$("sheetError").textContent=e.message}}
+function answerImage(item){draw(item);let s=solve(item),label=mode==="two"?`x = ${num(s.x)},  y = ${num(s.y)}`:`x = ${num(s)}`,d=cv.width/700,pad=Math.round(52*d),out=document.createElement("canvas"),o=out.getContext("2d");out.width=cv.width;out.height=cv.height+pad;o.fillStyle=mono?"#fff":"#fbfdff";o.fillRect(0,0,out.width,out.height);o.drawImage(cv,0,0);o.fillStyle=mono?"#000":"#182236";o.font=`700 ${26*d}px Segoe UI,Arial`;o.textAlign="center";o.textBaseline="middle";o.fillText(label,out.width/2,cv.height+pad/2);return{bytes:jpeg(out.toDataURL("image/jpeg",.94)),width:out.width,height:out.height}}
+$("one").onclick=()=>setMode("one");$("two").onclick=()=>setMode("two");$("generate").onclick=generate;$("custom").onclick=()=>{ins.forEach((x,i)=>{if(mode==="two"||!i)x.readOnly=false});$("e1").focus()};ins.forEach(x=>x.onkeydown=e=>{if(e.key==="Enter")drawAll()});$("toggle").onclick=()=>{visible=!visible;update()};$("color").onclick=()=>{mono=!mono;$("color").textContent=mono?"●":"◐";draw()};$("copy").onclick=async()=>{try{let b=await new Promise(r=>cv.toBlob(r));await navigator.clipboard.write([new ClipboardItem({"image/png":b})])}catch{$("message").textContent="Obrázek se nepodařilo zkopírovat."}};$("worksheet").onclick=()=>{$("singleSettings").classList.toggle("hide",mode==="two");$("systemInfo").classList.toggle("hide",mode==="one");$("dialogTitle").textContent=mode==="two"?"Pracovní list – soustavy":"Pracovní list – rovnice";$("dialog").showModal()};$("download").onclick=download;$("answers").onclick=()=>{if(last.length){let saved=cur,ims=last.map(answerImage);cur=saved;draw();save(pdf(ims),"vysledky-"+(mode==="two"?"soustavy":"rovnice")+".pdf")}};if(location.hash==="#system")setMode("two");else{$("e1").value="3x + 5 = x + 9";drawAll()}
+</script></body></html>
